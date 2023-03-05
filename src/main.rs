@@ -26,7 +26,6 @@ impl Config {
     fn new() -> Result<Config, &'static str> {
         let mut unsplash_key = String::new();
         let mut default_dir = String::new();
-        // let config_file_path = "config.txt";
 
         println!("Enter your unsplash key:");
         io::stdin().read_line(&mut unsplash_key);
@@ -34,11 +33,10 @@ impl Config {
 
         println!("Enter the directory you want to save your images:");
         io::stdin().read_line(&mut default_dir);
-        // let mut config_file = File::create(path)?;
 
-        // config_file.write_all(self::Config)?;
         let config_file_path = "config.txt";
         let mut config_file = File::create(config_file_path).unwrap();
+        
         let c = Config { unsplash_key: unsplash_key.trim().to_owned(), default_dir: default_dir.trim().to_owned() };
         let json_config = serde_json::to_string(&c).unwrap();
         config_file.write_all(json_config.as_bytes()).unwrap();
@@ -99,10 +97,23 @@ async fn get_image_from_unsplash(api_key: String, seed: String) -> Result<Bytes,
     let body: String = res.text().await?;
     let parsed_body: serde_json::Value = serde_json::from_str(&body)?;
 
-    println!("Found image: {}", parsed_body["results"][0]["description"]);
-    println!("Downloading image...");
-    let image_download_url = parsed_body["results"][0]["urls"]["raw"].as_str().unwrap();
+    if parsed_body["errors"].is_array() {
+        if parsed_body["errors"][0].as_str().unwrap().contains("OAuth") {
+            eprintln!("Failed to authenticate");
+            eprintln!("Exiting...");
+            process::exit(0);
+        }
+    }
 
+    if parsed_body["results"][0]["description"].is_null() {
+        println!("Found image");
+    } else {
+        println!("Found image: {}", parsed_body["results"][0]["description"]);
+    }
+
+    println!("Downloading image...");
+
+    let image_download_url = parsed_body["results"][0]["urls"]["raw"].as_str().unwrap();
     let download_response = reqwest::get(image_download_url).await?;
 
     return Ok(download_response.bytes().await?);
@@ -111,7 +122,12 @@ async fn get_image_from_unsplash(api_key: String, seed: String) -> Result<Bytes,
 
 
 fn get_image(arguments: Arguments, config: Config) -> Result<(), Box<dyn Error>> {
-    let content = get_image_from_unsplash(config.unsplash_key, arguments.seed).unwrap();
+    let content = get_image_from_unsplash(config.unsplash_key, arguments.seed).unwrap_or_else(
+        |err| {
+            eprint!("Problem getting image: {}", err);
+            process::exit(0);
+        }
+    );
     
     println!("Saving image at {}{}",config.default_dir, arguments.filename);
     let img = image::load_from_memory(&content)?;

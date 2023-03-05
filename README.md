@@ -4,20 +4,15 @@
 
 ### TODO
 
-- [ ] Set API keys on init
+- [x] Set API keys on init
 - [ ] Copy to clipboard
 - [ ] Add progress indicator
 - [ ] Add pexels api
 - [ ] Init set defaults
 
-#### Init defaults
-
-    - [ ] Api Keys
-    - [ ] Default dir path
-
 #### Flags
 
-```bash
+```
 
 -h, -help -- displays help info.
 
